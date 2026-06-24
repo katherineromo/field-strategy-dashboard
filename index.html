@@ -443,7 +443,6 @@ function renderStats() {
   `;
 
   // Owner progress cards
-  const ownerIcons = { AJ: '📡', Johnet: '📋', Kat: '🎯' };
   const ownerRoles = { AJ: 'Network Health & Risk', Johnet: 'Standardization & Gov.', Kat: 'Field Strategy Lead' };
   document.getElementById('owner-progress').innerHTML = Object.keys(OWNER_META).map(o => {
     const mine = allRecords.filter(r=>r.fields.Owner===o);
@@ -454,14 +453,22 @@ function renderStats() {
     const col  = OWNER_META[o].color;
     const circ2 = 2*Math.PI*28;
     const dash2 = (pct/100)*circ2;
+    // Stacked bar breakdown
+    const statuses = ['Complete','In Progress','At Risk','Not Started'];
+    const statusColors = {'Complete':'#10b981','In Progress':'#3b82f6','At Risk':'#e94560','Not Started':'#e2e8f0'};
+    const stackBars = statuses.map(s => {
+      const n = mine.filter(p=>p.fields.Status===s).length;
+      const w = mine.length ? (n/mine.length*100) : 0;
+      return w > 0 ? `<div title="${s}: ${n}" style="height:100%;width:${w}%;background:${statusColors[s]};transition:width .5s"></div>` : '';
+    }).join('');
     return `<div style="background:#fff;border-radius:14px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,.07);border-top:3px solid ${col}">
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:16px">
-        <div style="width:40px;height:40px;border-radius:50%;background:${col}18;display:flex;align-items:center;justify-content:center;font-size:18px">${ownerIcons[o]}</div>
-        <div>
+        <div style="width:36px;height:36px;border-radius:50%;background:${col};display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900;color:#fff;flex-shrink:0">${o[0]}</div>
+        <div style="flex:1">
           <div style="font-weight:800;font-size:14px;color:#1a1a2e">${o}</div>
           <div style="font-size:11px;color:#888">${ownerRoles[o]}</div>
         </div>
-        <div style="margin-left:auto;position:relative;width:56px;height:56px">
+        <div style="position:relative;width:56px;height:56px;flex-shrink:0">
           <svg width="56" height="56" style="transform:rotate(-90deg)">
             <circle cx="28" cy="28" r="22" fill="none" stroke="#f0f2f5" stroke-width="6"/>
             <circle cx="28" cy="28" r="22" fill="none" stroke="${col}" stroke-width="6"
@@ -471,19 +478,16 @@ function renderStats() {
           <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:${col}">${pct}%</div>
         </div>
       </div>
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;text-align:center">
-        <div style="background:#f8f9fb;border-radius:8px;padding:8px 4px">
-          <div style="font-size:16px;font-weight:800;color:#1a1a2e">${mine.length}</div>
-          <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.4px">Total</div>
-        </div>
-        <div style="background:#f0fdf4;border-radius:8px;padding:8px 4px">
-          <div style="font-size:16px;font-weight:800;color:#10b981">${done}</div>
-          <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.4px">Done</div>
-        </div>
-        <div style="background:${risk>0?'#fff5f5':'#f8f9fb'};border-radius:8px;padding:8px 4px">
-          <div style="font-size:16px;font-weight:800;color:${risk>0?'#e94560':'#94a3b8'}">${risk}</div>
-          <div style="font-size:10px;color:#888;text-transform:uppercase;letter-spacing:.4px">At Risk</div>
-        </div>
+      <!-- Stacked progress bar -->
+      <div style="height:6px;border-radius:4px;overflow:hidden;background:#f0f2f5;display:flex;margin-bottom:12px">${stackBars}</div>
+      <!-- Legend -->
+      <div style="display:flex;gap:10px;flex-wrap:wrap">
+        ${statuses.map(s => {
+          const n = mine.filter(p=>p.fields.Status===s).length;
+          return n > 0 ? `<div style="display:flex;align-items:center;gap:4px;font-size:11px;color:#555">
+            <div style="width:8px;height:8px;border-radius:2px;background:${statusColors[s]};flex-shrink:0"></div>${s} <strong>${n}</strong>
+          </div>` : '';
+        }).join('')}
       </div>
     </div>`;
   }).join('');
