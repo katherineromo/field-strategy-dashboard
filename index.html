@@ -314,7 +314,7 @@ function renderTable(containerId, records, showOwner, editable) {
     const f = r.fields;
     const ss = STATUS_STYLE[f.Status] || STATUS_STYLE['Not Started'];
     const ps = PRIORITY_STYLE[f.Priority] || PRIORITY_STYLE['Medium'];
-    const od = isOverdue(f.Due Date, f.Status);
+    const od = isOverdue(f['Due Date'], f.Status);
     const statusOpts = STATUSES.map(s => `<option${s===f.Status?' selected':''}>${s}</option>`).join('');
     const statusEl = editable
       ? `<select class="status-select" style="background:${ss.bg};color:${ss.color}" onchange="onStatusChange('${r.id}',this.value)">${statusOpts}</select>`
@@ -328,7 +328,7 @@ function renderTable(containerId, records, showOwner, editable) {
       ${ownerCell}
       <td>${badge(f.Priority||'Medium', ps)}</td>
       <td>${statusEl}</td>
-      <td style="color:${od?'#e94560':'#333'};font-weight:${od?700:400}">${fmtDate(f.Due Date)}${od?' ⚠':''}</td>
+      <td style="color:${od?'#e94560':'#333'};font-weight:${od?700:400}">${fmtDate(f['Due Date'])}${od?' ⚠':''}</td>
       <td style="color:#666;font-size:12px">${f.Notes||'—'}</td>
       ${deleteBtn}
     </tr>`;
@@ -391,7 +391,7 @@ function renderStats() {
   const total    = allRecords.length;
   const complete = allRecords.filter(r=>r.fields.Status==='Complete').length;
   const atRisk   = allRecords.filter(r=>r.fields.Status==='At Risk').length;
-  const overdue  = allRecords.filter(r=>isOverdue(r.fields.Due Date, r.fields.Status)).length;
+  const overdue  = allRecords.filter(r=>isOverdue(r.fields['Due Date'], r.fields.Status)).length;
   const inProg   = allRecords.filter(r=>r.fields.Status==='In Progress').length;
   const notStart = allRecords.filter(r=>r.fields.Status==='Not Started').length;
   const rate     = total ? Math.round(complete/total*100) : 0;
@@ -530,11 +530,11 @@ function renderReporting() {
     barHtml(p, allRecords.filter(r=>r.fields.Priority===p).length, total, PRIORITY_STYLE[p].color)
   ).join('');
 
-  const attn = allRecords.filter(r => r.fields.Status==='At Risk' || isOverdue(r.fields.Due Date, r.fields.Status));
+  const attn = allRecords.filter(r => r.fields.Status==='At Risk' || isOverdue(r.fields['Due Date'], r.fields.Status));
   const attnHtml = attn.length === 0
     ? `<div style="color:#10b981;font-weight:600;font-size:13px">✓ All clear — nothing flagged.</div>`
     : attn.map(r => `<div class="attention-item">
-        <div style="flex:1"><div class="name">${r.fields.Name||'Untitled'}</div><div class="meta">${r.fields.Owner} · Due ${fmtDate(r.fields.Due Date)}</div></div>
+        <div style="flex:1"><div class="name">${r.fields.Name||'Untitled'}</div><div class="meta">${r.fields.Owner} · Due ${fmtDate(r.fields['Due Date'])}</div></div>
         ${badge(r.fields.Status, STATUS_STYLE[r.fields.Status]||STATUS_STYLE['Not Started'])}
       </div>`).join('');
 
@@ -575,7 +575,7 @@ async function onAdd(owner) {
     Owner:    owner,
     Priority: document.getElementById(`new-priority-${owner}`).value,
     Status:   document.getElementById(`new-status-${owner}`).value,
-    Due Date:  document.getElementById(`new-due-${owner}`).value || null,
+    'Due Date':  document.getElementById(`new-due-${owner}`).value || null,
     Notes:    document.getElementById(`new-notes-${owner}`)?.value?.trim() || '',
   };
   const btn = document.getElementById(`add-btn-${owner}`);
