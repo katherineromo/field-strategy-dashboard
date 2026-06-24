@@ -19,9 +19,12 @@ app.get('/debug', (req, res) => {
 app.get('/', (req, res) => {
   let html = fs.readFileSync(path.join(__dirname, 'index.html'), 'utf8');
 
+  const token  = JSON.stringify(process.env.AIRTABLE_TOKEN   || '');
+  const baseId = JSON.stringify(process.env.AIRTABLE_BASE_ID || '');
+
   const inject = `<script>
-    window.AIRTABLE_TOKEN   = "${process.env.AIRTABLE_TOKEN   || ''}";
-    window.AIRTABLE_BASE_ID = "${process.env.AIRTABLE_BASE_ID || ''}";
+    window.AIRTABLE_TOKEN   = ${token};
+    window.AIRTABLE_BASE_ID = ${baseId};
   </script>`;
 
   html = html.replace('</head>', inject + '\n</head>');
