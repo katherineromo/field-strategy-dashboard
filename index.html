@@ -199,7 +199,7 @@ const AIRTABLE_API   = `https://api.airtable.com/v0/${AIRTABLE_BASE}/${TABLE_NAM
 const HEADERS        = { 'Authorization': `Bearer ${AIRTABLE_TOKEN}`, 'Content-Type': 'application/json' };
 
 // ── CONSTANTS ─────────────────────────────────────────────────────────────────
-const STATUSES   = ['Not Started','In Progress','At Risk','Complete'];
+const STATUSES   = ['Not Started','In Progress','Ongoing','At Risk','Complete'];
 const PRIORITIES = ['High','Medium','Low'];
 const OWNER_META = {
   AJ:     { color:'#3b82f6' },
@@ -209,6 +209,7 @@ const OWNER_META = {
 const STATUS_STYLE = {
   'Not Started': { bg:'#f3f4f6', color:'#374151' },
   'In Progress': { bg:'#dbeafe', color:'#1e40af' },
+  'Ongoing':     { bg:'#ede9fe', color:'#5b21b6' },
   'At Risk':     { bg:'#fee2e2', color:'#991b1b' },
   'Complete':    { bg:'#d1fae5', color:'#065f46' },
 };
@@ -239,7 +240,7 @@ function fmtDate(s) {
   const [y,m,d] = s.split('-');
   return `${m}/${d}/${y.slice(2)}`;
 }
-function isOverdue(due, status) { return due && status !== 'Complete' && due < todayISO(); }
+function isOverdue(due, status) { return due && status !== 'Complete' && status !== 'Ongoing' && due < todayISO(); }
 
 // ── AIRTABLE API ──────────────────────────────────────────────────────────────
 async function fetchAll() {
@@ -454,8 +455,8 @@ function renderStats() {
     const circ2 = 2*Math.PI*28;
     const dash2 = (pct/100)*circ2;
     // Stacked bar breakdown
-    const statuses = ['Complete','In Progress','At Risk','Not Started'];
-    const statusColors = {'Complete':'#10b981','In Progress':'#3b82f6','At Risk':'#e94560','Not Started':'#e2e8f0'};
+    const statuses = ['Complete','In Progress','Ongoing','At Risk','Not Started'];
+    const statusColors = {'Complete':'#10b981','In Progress':'#3b82f6','Ongoing':'#8b5cf6','At Risk':'#e94560','Not Started':'#e2e8f0'};
     const stackBars = statuses.map(s => {
       const n = mine.filter(p=>p.fields.Status===s).length;
       const w = mine.length ? (n/mine.length*100) : 0;
