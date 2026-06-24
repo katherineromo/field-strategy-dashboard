@@ -109,13 +109,6 @@
 <!-- NAV -->
 <div class="nav">
   <span class="nav-title">⚡ Field Strategy</span>
-  <div class="nav-tabs">
-    <button class="nav-tab active" onclick="showPage('overview',this)">Overview</button>
-    <button class="nav-tab" onclick="showPage('aj',this)">AJ — Network Health</button>
-    <button class="nav-tab" onclick="showPage('johnet',this)">Johnet — Standardization</button>
-    <button class="nav-tab" onclick="showPage('kat',this)">Kat — Leadership</button>
-    <button class="nav-tab" onclick="showPage('reporting',this)">Reporting</button>
-  </div>
   <div class="nav-user">
     <span style="font-size:11px;color:#9ca3af;">Viewing as:</span>
     <select class="user-select" id="current-user" onchange="onUserChange()">
@@ -125,6 +118,14 @@
       <option value="Kat">Kat</option>
     </select>
   </div>
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="showPage('overview',this)">Overview</button>
+    <button class="nav-tab" onclick="showPage('aj',this)">AJ — Network Health</button>
+    <button class="nav-tab" onclick="showPage('johnet',this)">Johnet — Standardization</button>
+    <button class="nav-tab" onclick="showPage('kat',this)">Kat — Leadership</button>
+    <button class="nav-tab" onclick="showPage('reporting',this)">Reporting</button>
+  </div>
+
 </div>
 
 <!-- PAGES -->
@@ -324,9 +325,9 @@ function renderTable(containerId, records, showOwner, editable) {
 function renderAddForm(areaId, owner) {
   const area = document.getElementById(areaId);
   if (!area) return;
-  const canEdit = currentUser === owner;
+  const canEdit = currentUser === owner || currentUser === 'Kat';
   if (!canEdit) {
-    area.innerHTML = `<div class="locked-notice">👁 You are viewing as <strong>${currentUser||'guest'}</strong>. Select <strong>${owner}</strong> from the top-right menu to add or edit projects here.</div>`;
+    area.innerHTML = `<div class="locked-notice">👁 You are viewing as <strong>${currentUser||'guest'}</strong>. Only <strong>${owner}</strong> or <strong>Kat</strong> can add projects here.</div>`;
     return;
   }
   area.innerHTML = `<div class="add-form">
@@ -442,7 +443,7 @@ function render() {
   ['AJ','Johnet','Kat'].forEach(o => {
     const mine = allRecords.filter(r=>r.fields.Owner===o);
     document.getElementById(o.toLowerCase()+'-count').textContent = mine.length;
-    renderTable(o.toLowerCase()+'-table-wrap', mine, false, currentUser===o);
+    renderTable(o.toLowerCase()+'-table-wrap', mine, false, currentUser===o || currentUser==='Kat');
   });
   renderReporting();
 }
