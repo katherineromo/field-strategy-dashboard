@@ -320,14 +320,13 @@ function renderTable(containerId, records, showOwner, editable) {
       ? `<select class="status-select" style="background:${ss.bg};color:${ss.color}" onchange="onStatusChange('${r.id}',this.value)">${statusOpts}</select>`
       : badge(f.Status||'Not Started', ss);
     const ownerCell = showOwner ? `<td>${pill(f.Owner||'—', OWNER_META[f.Owner]?.color||'#888')}</td>` : '';
-    const attachments = (f.Attachments||[]).map(a =>
-      `<a href="${a.url}" target="_blank" style="display:inline-block;padding:2px 8px;background:#f0f2f5;border-radius:6px;font-size:11px;color:#3b82f6;text-decoration:none;margin:1px 2px 1px 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:120px" title="${a.filename}">📎 ${a.filename}</a>`
-    ).join('');
-    const uploadBtn = editable
-      ? `<label style="cursor:pointer;padding:2px 8px;background:#f0f2f5;border-radius:6px;font-size:11px;color:#555;display:inline-block;margin:1px 0">
-          + Add
-          <input type="file" style="display:none" onchange="onAttach('${r.id}', this)" />
-        </label>` : '';
+    const links = (f.Links||'').split('\n').filter(l=>l.trim()).map(l => {
+      const url = l.trim();
+      const isSheet = url.includes('spreadsheet');
+      const isDoc = url.includes('document');
+      const label = isSheet ? '📊 Sheet' : isDoc ? '📄 Doc' : '🔗 Link';
+      return `<a href="${url}" target="_blank" style="display:inline-block;padding:2px 8px;background:#f0f2f5;border-radius:6px;font-size:11px;color:#3b82f6;text-decoration:none;margin:1px 2px 1px 0;white-space:nowrap">${label}</a>`;
+    }).join('');
     const deleteBtn = editable
       ? `<td><button class="btn btn-danger" onclick="onDelete('${r.id}')">✕</button></td>`
       : `<td></td>`;
@@ -338,12 +337,12 @@ function renderTable(containerId, records, showOwner, editable) {
       <td>${statusEl}</td>
       <td style="color:${od?'#e94560':'#333'};font-weight:${od?700:400}">${fmtDate(f['Due Date'])}${od?' ⚠':''}</td>
       <td style="color:#666;font-size:12px">${f.Notes||'—'}</td>
-      <td style="min-width:120px">${attachments}${uploadBtn}</td>
+      <td style="min-width:120px">${links||'—'}</td>
       ${deleteBtn}
     </tr>`;
   }).join('');
   wrap.innerHTML = `<table>
-    <thead><tr><th>Project</th>${ownerCol}<th>Priority</th><th>Status</th><th>Due</th><th>Notes</th><th>Attachments</th><th></th></tr></thead>
+    <thead><tr><th>Project</th>${ownerCol}<th>Priority</th><th>Status</th><th>Due</th><th>Notes</th><th>Links</th><th></th></tr></thead>
     <tbody>${rows}</tbody>
   </table>`;
 }
@@ -382,6 +381,10 @@ function renderAddForm(areaId, owner) {
       <div class="form-group" style="flex:2;min-width:140px">
         <label>Notes</label>
         <input id="new-notes-${owner}" placeholder="Brief description..." />
+      </div>
+      <div class="form-group" style="flex:2;min-width:140px">
+        <label>Links (Google Doc/Sheet URLs, one per line)</label>
+        <textarea id="new-links-${owner}" rows="2" placeholder="https://docs.google.com/..." style="resize:vertical"></textarea>
       </div>
       <div class="form-group" style="justify-content:flex-end">
         <button class="btn btn-primary" id="add-btn-${owner}" onclick="onAdd('${owner}')">Add</button>
@@ -586,6 +589,7 @@ async function onAdd(owner) {
     Status:   document.getElementById(`new-status-${owner}`).value,
     'Due Date':  document.getElementById(`new-due-${owner}`).value || null,
     Notes:    document.getElementById(`new-notes-${owner}`)?.value?.trim() || '',
+    Links:    document.getElementById(`new-links-${owner}`)?.value?.trim() || '',
   };
   const btn = document.getElementById(`add-btn-${owner}`);
   if (btn) { btn.disabled = true; btn.textContent = 'Adding...'; }
@@ -621,44 +625,6 @@ async function onStatusChange(id, newStatus) {
     toast('Status updated.');
   } catch(e) {
     toast('Failed to update status.', true);
-  }
-}
-
-async function onAttach(recordId, input) {
-  const file = input.files[0];
-  if (!file) return;
-  toast('Uploading...');
-  try {
-    // Step 1: get an Airtable upload URL
-    const initRes = await fetch(`https://api.airtable.com/v0/${AIRTABLE_BASE}/Projects/${recordId}/uploadAttachment`, {
-      method: 'POST',
-      headers: { ...HEADERS },
-      body: JSON.stringify({
-        filename: file.name,
-        contentType: file.type || 'application/octet-stream',
-      })
-    });
-    if (!initRes.ok) throw new Error('Upload init failed');
-    const { uploadUrl, id: attachmentId } = await initRes.json();
-
-    // Step 2: upload the file bytes
-    await fetch(uploadUrl, {
-      method: 'PUT',
-      headers: { 'Content-Type': file.type || 'application/octet-stream' },
-      body: file,
-    });
-
-    // Step 3: link attachment to the record
-    const existing = (allRecords.find(r=>r.id===recordId)?.fields?.Attachments || []).map(a=>({id:a.id}));
-    await updateRecord(recordId, { Attachments: [...existing, { id: attachmentId }] });
-
-    // Refresh data
-    allRecords = await fetchAll();
-    render();
-    toast('File attached!');
-  } catch(e) {
-    console.error(e);
-    toast('Upload failed. Try attaching via Airtable directly.', true);
   }
 }
 
