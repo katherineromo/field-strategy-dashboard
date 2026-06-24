@@ -31,8 +31,6 @@ app.get('/', (req, res) => {
   res.send(html);
 });
 
-app.use(express.static(__dirname));
-
 app.listen(PORT, () => {
   console.log(`Field Strategy Dashboard running on port ${PORT}`);
   console.log(`AIRTABLE_TOKEN set: ${!!process.env.AIRTABLE_TOKEN}`);
