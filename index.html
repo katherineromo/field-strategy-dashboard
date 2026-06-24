@@ -1,0 +1,516 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Field Strategy Dashboard</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f0f2f5; color: #1a1a2e; min-height: 100vh; }
+
+  /* NAV */
+  .nav { background: #1a1a2e; color: #fff; padding: 0 24px; display: flex; align-items: center; height: 52px; gap: 0; }
+  .nav-title { font-weight: 800; font-size: 15px; letter-spacing: .5px; color: #e94560; margin-right: 28px; flex-shrink: 0; }
+  .nav-tabs { display: flex; gap: 0; flex: 1; overflow-x: auto; }
+  .nav-tab { padding: 0 16px; height: 52px; line-height: 52px; font-size: 13px; cursor: pointer; color: #9ca3af; border: none; background: none; border-bottom: 3px solid transparent; font-weight: 400; white-space: nowrap; transition: all .2s; }
+  .nav-tab:hover { color: #fff; }
+  .nav-tab.active { color: #fff; border-bottom-color: #e94560; font-weight: 700; }
+  .nav-user { margin-left: auto; display: flex; align-items: center; gap: 10px; flex-shrink: 0; padding-left: 16px; }
+  .user-select { background: #2d2d4a; border: 1px solid #3d3d5c; color: #fff; border-radius: 6px; padding: 5px 10px; font-size: 12px; cursor: pointer; outline: none; }
+
+  /* PAGES */
+  .page { display: none; padding: 24px; }
+  .page.active { display: block; }
+
+  /* LOADING */
+  .loading { display: flex; align-items: center; justify-content: center; min-height: 200px; color: #888; font-size: 14px; gap: 10px; }
+  .spinner { width: 20px; height: 20px; border: 2px solid #e0e0e0; border-top-color: #3b82f6; border-radius: 50%; animation: spin .7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* STAT CARDS */
+  .cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 14px; margin-bottom: 24px; }
+  .card { background: #fff; border-radius: 10px; padding: 16px 18px; box-shadow: 0 1px 4px rgba(0,0,0,.07); }
+  .card-label { font-size: 11px; text-transform: uppercase; letter-spacing: .6px; color: #888; margin-bottom: 6px; }
+  .card-value { font-size: 28px; font-weight: 800; }
+
+  /* OWNER HEADER */
+  .owner-header { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; padding: 16px 20px; border-radius: 12px; color: #fff; }
+  .owner-avatar { width: 44px; height: 44px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; font-weight: 800; background: rgba(255,255,255,.15); flex-shrink: 0; }
+  .owner-header h2 { font-size: 16px; font-weight: 800; }
+  .owner-header p { font-size: 12px; opacity: .85; margin-top: 2px; }
+  .owner-count { margin-left: auto; text-align: right; }
+  .owner-count .num { font-size: 22px; font-weight: 800; }
+  .owner-count .lbl { font-size: 11px; opacity: .75; }
+
+  /* SECTION TITLE */
+  .section-title { font-size: 15px; font-weight: 700; margin-bottom: 12px; }
+
+  /* ADD FORM */
+  .add-form { background: #fff; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,.07); padding: 16px 18px; margin-bottom: 20px; }
+  .add-form h4 { font-size: 13px; font-weight: 700; margin-bottom: 12px; }
+  .form-row { display: flex; gap: 10px; flex-wrap: wrap; align-items: flex-end; }
+  .form-group { display: flex; flex-direction: column; gap: 4px; }
+  .form-group label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: .4px; }
+  .form-group input, .form-group select, .form-group textarea {
+    border: 1px solid #e0e0e0; border-radius: 6px; padding: 7px 10px; font-size: 13px;
+    outline: none; background: #fafafa; font-family: inherit;
+  }
+  .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: #3b82f6; background: #fff; }
+  .btn { padding: 8px 18px; border-radius: 6px; border: none; font-size: 13px; font-weight: 700; cursor: pointer; transition: opacity .2s; }
+  .btn-primary { background: #1a1a2e; color: #fff; }
+  .btn-primary:hover { opacity: .85; }
+  .btn-primary:disabled { opacity: .5; cursor: not-allowed; }
+  .btn-danger { background: #fee2e2; color: #991b1b; font-size: 11px; padding: 4px 10px; }
+  .btn-danger:hover { background: #fca5a5; }
+
+  /* TABLE */
+  .tbl-wrap { background: #fff; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,.07); overflow: hidden; margin-bottom: 24px; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 600px; }
+  thead th { background: #f8f9fb; padding: 10px 14px; text-align: left; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: #888; border-bottom: 1px solid #eee; font-weight: 600; }
+  tbody tr { border-bottom: 1px solid #f0f0f0; transition: background .15s; }
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: #fafbff; }
+  tbody td { padding: 10px 14px; }
+  .empty-row td { text-align: center; color: #aaa; padding: 28px; }
+
+  /* BADGES */
+  .badge { display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: 11px; font-weight: 700; }
+  .status-select { border: none; border-radius: 12px; padding: 3px 10px; font-size: 11px; font-weight: 700; cursor: pointer; outline: none; }
+
+  /* REPORTING */
+  .report-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .report-box { background: #fff; border-radius: 10px; padding: 20px; box-shadow: 0 1px 4px rgba(0,0,0,.07); }
+  .report-box h3 { font-size: 14px; font-weight: 700; margin-bottom: 14px; }
+  .bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 9px; }
+  .bar-label { font-size: 12px; width: 115px; flex-shrink: 0; color: #555; }
+  .bar-track { flex: 1; background: #f0f2f5; border-radius: 6px; height: 10px; overflow: hidden; }
+  .bar-fill { height: 100%; border-radius: 6px; transition: width .5s; }
+  .bar-count { font-size: 12px; font-weight: 700; width: 24px; text-align: right; flex-shrink: 0; }
+  .attention-item { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; padding: 8px 10px; background: #fff5f5; border-radius: 8px; border-left: 3px solid #e94560; }
+  .attention-item .name { font-size: 13px; font-weight: 600; }
+  .attention-item .meta { font-size: 11px; color: #888; margin-top: 2px; }
+
+  /* TOAST */
+  .toast { position: fixed; bottom: 24px; right: 24px; background: #1a1a2e; color: #fff; padding: 12px 20px; border-radius: 8px; font-size: 13px; font-weight: 600; opacity: 0; transform: translateY(8px); transition: all .3s; z-index: 999; pointer-events: none; }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .toast.error { background: #991b1b; }
+
+  /* LOCKED NOTICE */
+  .locked-notice { background: #fef3c7; border: 1px solid #fbbf24; border-radius: 8px; padding: 10px 14px; font-size: 13px; color: #92400e; margin-bottom: 16px; }
+
+  @media (max-width: 700px) {
+    .report-grid { grid-template-columns: 1fr; }
+    .nav-title { font-size: 13px; margin-right: 12px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- NAV -->
+<div class="nav">
+  <span class="nav-title">⚡ Field Strategy</span>
+  <div class="nav-tabs">
+    <button class="nav-tab active" onclick="showPage('overview',this)">Overview</button>
+    <button class="nav-tab" onclick="showPage('aj',this)">AJ — Network Health</button>
+    <button class="nav-tab" onclick="showPage('johnet',this)">Johnet — Standardization</button>
+    <button class="nav-tab" onclick="showPage('kat',this)">Kat — Leadership</button>
+    <button class="nav-tab" onclick="showPage('reporting',this)">Reporting</button>
+  </div>
+  <div class="nav-user">
+    <span style="font-size:11px;color:#9ca3af;">Viewing as:</span>
+    <select class="user-select" id="current-user" onchange="onUserChange()">
+      <option value="">— select —</option>
+      <option value="AJ">AJ</option>
+      <option value="Johnet">Johnet</option>
+      <option value="Kat">Kat</option>
+    </select>
+  </div>
+</div>
+
+<!-- PAGES -->
+<div id="page-overview" class="page active">
+  <div class="cards" id="overview-cards"><div class="loading"><div class="spinner"></div> Loading...</div></div>
+  <div class="section-title">All Projects</div>
+  <div class="tbl-wrap" id="all-table-wrap"><div class="loading"><div class="spinner"></div> Loading...</div></div>
+</div>
+
+<div id="page-aj" class="page">
+  <div class="owner-header" style="background:linear-gradient(135deg,#1a1a2e,#3b82f6)">
+    <div class="owner-avatar">A</div>
+    <div><h2>AJ Sheets</h2><p>Network Health &amp; Risk · Field feedback loops · Risk monitoring · Launch tracking · Gemba trends</p></div>
+    <div class="owner-count"><div class="num" id="aj-count">—</div><div class="lbl">projects</div></div>
+  </div>
+  <div id="aj-form-area"></div>
+  <div class="tbl-wrap" id="aj-table-wrap"><div class="loading"><div class="spinner"></div> Loading...</div></div>
+</div>
+
+<div id="page-johnet" class="page">
+  <div class="owner-header" style="background:linear-gradient(135deg,#1a1a2e,#8b5cf6)">
+    <div class="owner-avatar">J</div>
+    <div><h2>Johnet Sewell</h2><p>Standardization &amp; Governance · SOP library · Process documentation · Governance frameworks</p></div>
+    <div class="owner-count"><div class="num" id="johnet-count">—</div><div class="lbl">projects</div></div>
+  </div>
+  <div id="johnet-form-area"></div>
+  <div class="tbl-wrap" id="johnet-table-wrap"><div class="loading"><div class="spinner"></div> Loading...</div></div>
+</div>
+
+<div id="page-kat" class="page">
+  <div class="owner-header" style="background:linear-gradient(135deg,#1a1a2e,#e94560)">
+    <div class="owner-avatar">K</div>
+    <div><h2>Katherine Romo</h2><p>Field Strategy Leadership · Team priorities · Stakeholder relationships · Business alignment</p></div>
+    <div class="owner-count"><div class="num" id="kat-count">—</div><div class="lbl">projects</div></div>
+  </div>
+  <div id="kat-form-area"></div>
+  <div class="tbl-wrap" id="kat-table-wrap"><div class="loading"><div class="spinner"></div> Loading...</div></div>
+</div>
+
+<div id="page-reporting" class="page">
+  <div class="section-title">Team Reporting</div>
+  <div class="report-grid" id="report-grid"><div class="loading"><div class="spinner"></div> Loading...</div></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── CONFIG ────────────────────────────────────────────────────────────────────
+// These values come from your environment variables (set in Render dashboard)
+const AIRTABLE_TOKEN = window.AIRTABLE_TOKEN || '';
+const AIRTABLE_BASE  = window.AIRTABLE_BASE_ID || '';
+const TABLE_NAME     = 'Projects';
+
+const AIRTABLE_API   = `https://api.airtable.com/v0/${AIRTABLE_BASE}/${TABLE_NAME}`;
+const HEADERS        = { 'Authorization': `Bearer ${AIRTABLE_TOKEN}`, 'Content-Type': 'application/json' };
+
+// ── CONSTANTS ─────────────────────────────────────────────────────────────────
+const STATUSES   = ['Not Started','In Progress','At Risk','Complete'];
+const PRIORITIES = ['High','Medium','Low'];
+const OWNER_META = {
+  AJ:     { color:'#3b82f6' },
+  Johnet: { color:'#8b5cf6' },
+  Kat:    { color:'#e94560' },
+};
+const STATUS_STYLE = {
+  'Not Started': { bg:'#f3f4f6', color:'#374151' },
+  'In Progress': { bg:'#dbeafe', color:'#1e40af' },
+  'At Risk':     { bg:'#fee2e2', color:'#991b1b' },
+  'Complete':    { bg:'#d1fae5', color:'#065f46' },
+};
+const PRIORITY_STYLE = {
+  High:   { bg:'#fee2e2', color:'#991b1b' },
+  Medium: { bg:'#fef3c7', color:'#92400e' },
+  Low:    { bg:'#d1fae5', color:'#065f46' },
+};
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+let allRecords = []; // [{ id, fields: { Name, Owner, Priority, Status, DueDate, Notes } }]
+let currentUser = '';
+
+// ── TOAST ─────────────────────────────────────────────────────────────────────
+let toastTimer;
+function toast(msg, isError=false) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show' + (isError ? ' error' : '');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+// ── DATE HELPERS ──────────────────────────────────────────────────────────────
+function todayISO() { return new Date().toISOString().slice(0,10); }
+function fmtDate(s) {
+  if (!s) return '—';
+  const [y,m,d] = s.split('-');
+  return `${m}/${d}/${y.slice(2)}`;
+}
+function isOverdue(due, status) { return due && status !== 'Complete' && due < todayISO(); }
+
+// ── AIRTABLE API ──────────────────────────────────────────────────────────────
+async function fetchAll() {
+  let records = [], offset;
+  do {
+    const url = AIRTABLE_API + (offset ? `?offset=${offset}` : '');
+    const res = await fetch(url, { headers: HEADERS });
+    if (!res.ok) throw new Error(`Airtable error: ${res.status}`);
+    const data = await res.json();
+    records = records.concat(data.records);
+    offset = data.offset;
+  } while (offset);
+  return records;
+}
+
+async function createRecord(fields) {
+  const res = await fetch(AIRTABLE_API, {
+    method: 'POST', headers: HEADERS,
+    body: JSON.stringify({ records: [{ fields }] })
+  });
+  if (!res.ok) throw new Error('Failed to create');
+  const data = await res.json();
+  return data.records[0];
+}
+
+async function updateRecord(id, fields) {
+  const res = await fetch(`${AIRTABLE_API}/${id}`, {
+    method: 'PATCH', headers: HEADERS,
+    body: JSON.stringify({ fields })
+  });
+  if (!res.ok) throw new Error('Failed to update');
+  return (await res.json());
+}
+
+async function deleteRecord(id) {
+  const res = await fetch(`${AIRTABLE_API}/${id}`, { method: 'DELETE', headers: HEADERS });
+  if (!res.ok) throw new Error('Failed to delete');
+}
+
+// ── LOAD & REFRESH ────────────────────────────────────────────────────────────
+async function loadData() {
+  try {
+    allRecords = await fetchAll();
+    render();
+  } catch(e) {
+    console.error(e);
+    toast('Could not load data. Check Airtable config.', true);
+    // Show empty state anyway
+    allRecords = [];
+    render();
+  }
+}
+
+// ── RENDER HELPERS ────────────────────────────────────────────────────────────
+function badge(label, style) {
+  return `<span class="badge" style="background:${style.bg};color:${style.color}">${label}</span>`;
+}
+function pill(label, color) {
+  return `<span class="badge" style="background:${color}22;color:${color}">${label}</span>`;
+}
+
+function renderTable(containerId, records, showOwner, editable) {
+  const wrap = document.getElementById(containerId);
+  if (!wrap) return;
+  if (!records.length) {
+    wrap.innerHTML = `<div class="loading" style="color:#aaa">No projects yet${editable ? ' — add one above.' : '.'}</div>`;
+    return;
+  }
+  const ownerCol = showOwner ? `<th>Owner</th>` : '';
+  const rows = records.map(r => {
+    const f = r.fields;
+    const ss = STATUS_STYLE[f.Status] || STATUS_STYLE['Not Started'];
+    const ps = PRIORITY_STYLE[f.Priority] || PRIORITY_STYLE['Medium'];
+    const od = isOverdue(f.DueDate, f.Status);
+    const statusOpts = STATUSES.map(s => `<option${s===f.Status?' selected':''}>${s}</option>`).join('');
+    const statusEl = editable
+      ? `<select class="status-select" style="background:${ss.bg};color:${ss.color}" onchange="onStatusChange('${r.id}',this.value)">${statusOpts}</select>`
+      : badge(f.Status||'Not Started', ss);
+    const ownerCell = showOwner ? `<td>${pill(f.Owner||'—', OWNER_META[f.Owner]?.color||'#888')}</td>` : '';
+    const deleteBtn = editable
+      ? `<td><button class="btn btn-danger" onclick="onDelete('${r.id}')">✕</button></td>`
+      : `<td></td>`;
+    return `<tr>
+      <td style="font-weight:600">${f.Name||'Untitled'}</td>
+      ${ownerCell}
+      <td>${badge(f.Priority||'Medium', ps)}</td>
+      <td>${statusEl}</td>
+      <td style="color:${od?'#e94560':'#333'};font-weight:${od?700:400}">${fmtDate(f.DueDate)}${od?' ⚠':''}</td>
+      <td style="color:#666;font-size:12px">${f.Notes||'—'}</td>
+      ${deleteBtn}
+    </tr>`;
+  }).join('');
+  wrap.innerHTML = `<table>
+    <thead><tr><th>Project</th>${ownerCol}<th>Priority</th><th>Status</th><th>Due</th><th>Notes</th><th></th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+function renderAddForm(areaId, owner) {
+  const area = document.getElementById(areaId);
+  if (!area) return;
+  const canEdit = currentUser === owner;
+  if (!canEdit) {
+    area.innerHTML = `<div class="locked-notice">👁 You are viewing as <strong>${currentUser||'guest'}</strong>. Select <strong>${owner}</strong> from the top-right menu to add or edit projects here.</div>`;
+    return;
+  }
+  area.innerHTML = `<div class="add-form">
+    <h4>+ Add Project</h4>
+    <div class="form-row">
+      <div class="form-group" style="flex:2;min-width:160px">
+        <label>Project Name</label>
+        <input id="new-name-${owner}" placeholder="e.g. Network Health Readout" />
+      </div>
+      <div class="form-group" style="flex:0 0 110px">
+        <label>Priority</label>
+        <select id="new-priority-${owner}">
+          ${PRIORITIES.map(p=>`<option>${p}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group" style="flex:0 0 120px">
+        <label>Status</label>
+        <select id="new-status-${owner}">
+          ${STATUSES.map(s=>`<option>${s}</option>`).join('')}
+        </select>
+      </div>
+      <div class="form-group" style="flex:0 0 140px">
+        <label>Due Date</label>
+        <input type="date" id="new-due-${owner}" />
+      </div>
+      <div class="form-group" style="flex:2;min-width:140px">
+        <label>Notes</label>
+        <input id="new-notes-${owner}" placeholder="Brief description..." />
+      </div>
+      <div class="form-group" style="justify-content:flex-end">
+        <button class="btn btn-primary" id="add-btn-${owner}" onclick="onAdd('${owner}')">Add</button>
+      </div>
+    </div>
+  </div>`;
+}
+
+function renderStats() {
+  const total    = allRecords.length;
+  const complete = allRecords.filter(r=>r.fields.Status==='Complete').length;
+  const atRisk   = allRecords.filter(r=>r.fields.Status==='At Risk').length;
+  const overdue  = allRecords.filter(r=>isOverdue(r.fields.DueDate, r.fields.Status)).length;
+  const inProg   = allRecords.filter(r=>r.fields.Status==='In Progress').length;
+  const rate     = total ? Math.round(complete/total*100) : 0;
+  document.getElementById('overview-cards').innerHTML = `
+    <div class="card"><div class="card-label">Total Projects</div><div class="card-value" style="color:#3b82f6">${total}</div></div>
+    <div class="card"><div class="card-label">In Progress</div><div class="card-value" style="color:#3b82f6">${inProg}</div></div>
+    <div class="card"><div class="card-label">Complete</div><div class="card-value" style="color:#10b981">${complete}</div></div>
+    <div class="card"><div class="card-label">At Risk</div><div class="card-value" style="color:#e94560">${atRisk}</div></div>
+    <div class="card"><div class="card-label">Overdue</div><div class="card-value" style="color:#f59e0b">${overdue}</div></div>
+    <div class="card"><div class="card-label">Completion Rate</div><div class="card-value" style="color:${rate>=50?'#10b981':'#f59e0b'}">${rate}%</div></div>
+  `;
+}
+
+function barHtml(label, count, total, color) {
+  const pct = total ? Math.round(count/total*100) : 0;
+  return `<div class="bar-row">
+    <span class="bar-label">${label}</span>
+    <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${color}"></div></div>
+    <span class="bar-count">${count}</span>
+  </div>`;
+}
+
+function renderReporting() {
+  const total = allRecords.length;
+  const byOwner = o => allRecords.filter(r=>r.fields.Owner===o);
+
+  const statusBars = STATUSES.map(s =>
+    barHtml(s, allRecords.filter(r=>r.fields.Status===s).length, total, STATUS_STYLE[s].color)
+  ).join('');
+
+  const ownerBars = Object.keys(OWNER_META).map(o =>
+    barHtml(o, byOwner(o).length, total, OWNER_META[o].color)
+  ).join('');
+
+  const completionBars = Object.keys(OWNER_META).map(o => {
+    const mine = byOwner(o);
+    const done = mine.filter(r=>r.fields.Status==='Complete').length;
+    const pct = mine.length ? Math.round(done/mine.length*100) : 0;
+    return `<div class="bar-row">
+      <span class="bar-label">${o}</span>
+      <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${OWNER_META[o].color}"></div></div>
+      <span class="bar-count">${pct}%</span>
+    </div>`;
+  }).join('');
+
+  const priorityBars = PRIORITIES.map(p =>
+    barHtml(p, allRecords.filter(r=>r.fields.Priority===p).length, total, PRIORITY_STYLE[p].color)
+  ).join('');
+
+  const attn = allRecords.filter(r => r.fields.Status==='At Risk' || isOverdue(r.fields.DueDate, r.fields.Status));
+  const attnHtml = attn.length === 0
+    ? `<div style="color:#10b981;font-weight:600;font-size:13px">✓ All clear — nothing flagged.</div>`
+    : attn.map(r => `<div class="attention-item">
+        <div style="flex:1"><div class="name">${r.fields.Name||'Untitled'}</div><div class="meta">${r.fields.Owner} · Due ${fmtDate(r.fields.DueDate)}</div></div>
+        ${badge(r.fields.Status, STATUS_STYLE[r.fields.Status]||STATUS_STYLE['Not Started'])}
+      </div>`).join('');
+
+  document.getElementById('report-grid').innerHTML = `
+    <div class="report-box"><h3>Status — All Projects</h3>${statusBars}</div>
+    <div class="report-box"><h3>Projects by Owner</h3>${ownerBars}<div style="border-top:1px solid #f0f0f0;padding-top:14px;margin-top:14px"><div style="font-weight:700;font-size:13px;margin-bottom:10px">Completion Rate by Owner</div>${completionBars}</div></div>
+    <div class="report-box"><h3>Priority Distribution</h3>${priorityBars}</div>
+    <div class="report-box"><h3>⚠ Needs Attention</h3>${attnHtml}</div>
+  `;
+}
+
+function render() {
+  renderStats();
+  renderAddForm('aj-form-area', 'AJ');
+  renderAddForm('johnet-form-area', 'Johnet');
+  renderAddForm('kat-form-area', 'Kat');
+
+  renderTable('all-table-wrap', allRecords, true, false);
+  ['AJ','Johnet','Kat'].forEach(o => {
+    const mine = allRecords.filter(r=>r.fields.Owner===o);
+    document.getElementById(o.toLowerCase()+'-count').textContent = mine.length;
+    renderTable(o.toLowerCase()+'-table-wrap', mine, false, currentUser===o);
+  });
+  renderReporting();
+}
+
+// ── EVENT HANDLERS ────────────────────────────────────────────────────────────
+function onUserChange() {
+  currentUser = document.getElementById('current-user').value;
+  render();
+}
+
+async function onAdd(owner) {
+  const name  = document.getElementById(`new-name-${owner}`)?.value?.trim();
+  if (!name) { toast('Please enter a project name.', true); return; }
+  const fields = {
+    Name:     name,
+    Owner:    owner,
+    Priority: document.getElementById(`new-priority-${owner}`).value,
+    Status:   document.getElementById(`new-status-${owner}`).value,
+    DueDate:  document.getElementById(`new-due-${owner}`).value || null,
+    Notes:    document.getElementById(`new-notes-${owner}`)?.value?.trim() || '',
+  };
+  const btn = document.getElementById(`add-btn-${owner}`);
+  if (btn) { btn.disabled = true; btn.textContent = 'Adding...'; }
+  try {
+    const record = await createRecord(fields);
+    allRecords.push(record);
+    render();
+    toast('Project added!');
+  } catch(e) {
+    toast('Failed to add project. Check your connection.', true);
+    if (btn) { btn.disabled = false; btn.textContent = 'Add'; }
+  }
+}
+
+async function onDelete(id) {
+  if (!confirm('Delete this project?')) return;
+  try {
+    await deleteRecord(id);
+    allRecords = allRecords.filter(r=>r.id!==id);
+    render();
+    toast('Project deleted.');
+  } catch(e) {
+    toast('Failed to delete.', true);
+  }
+}
+
+async function onStatusChange(id, newStatus) {
+  try {
+    await updateRecord(id, { Status: newStatus });
+    const rec = allRecords.find(r=>r.id===id);
+    if (rec) rec.fields.Status = newStatus;
+    render();
+    toast('Status updated.');
+  } catch(e) {
+    toast('Failed to update status.', true);
+  }
+}
+
+// ── NAV ───────────────────────────────────────────────────────────────────────
+function showPage(id, btn) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-tab').forEach(t=>t.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+loadData();
+</script>
+</body>
+</html>
