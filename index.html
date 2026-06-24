@@ -188,6 +188,29 @@
 
 <div class="toast" id="toast"></div>
 
+<!-- EDIT MODAL -->
+<div id="edit-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:14px;padding:24px;width:90%;max-width:560px;box-shadow:0 8px 32px rgba(0,0,0,.2)">
+    <div style="font-size:15px;font-weight:800;margin-bottom:16px;color:#1a1a2e">Edit Project</div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="form-group"><label>Project Name</label><input id="edit-name" /></div>
+      <div style="display:flex;gap:10px">
+        <div class="form-group" style="flex:1"><label>Priority</label>
+          <select id="edit-priority"></select></div>
+        <div class="form-group" style="flex:1"><label>Status</label>
+          <select id="edit-status"></select></div>
+        <div class="form-group" style="flex:1"><label>Due Date</label><input type="date" id="edit-due" /></div>
+      </div>
+      <div class="form-group"><label>Notes</label><input id="edit-notes" /></div>
+      <div class="form-group"><label>Links (one per line)</label><textarea id="edit-links" rows="3" style="resize:vertical"></textarea></div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px">
+      <button class="btn" style="background:#f0f2f5;color:#333" onclick="closeEdit()">Cancel</button>
+      <button class="btn btn-primary" id="edit-save-btn" onclick="saveEdit()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ── CONFIG ────────────────────────────────────────────────────────────────────
 // These values come from your environment variables (set in Render dashboard)
@@ -328,7 +351,10 @@ function renderTable(containerId, records, showOwner, editable) {
       return `<a href="${url}" target="_blank" style="display:inline-block;padding:2px 8px;background:#f0f2f5;border-radius:6px;font-size:11px;color:#3b82f6;text-decoration:none;margin:1px 2px 1px 0;white-space:nowrap">${label}</a>`;
     }).join('');
     const deleteBtn = editable
-      ? `<td><button class="btn btn-danger" onclick="onDelete('${r.id}')">✕</button></td>`
+      ? `<td style="white-space:nowrap">
+          <button class="btn btn-danger" style="margin-right:4px" onclick="openEdit('${r.id}')">✏️</button>
+          <button class="btn btn-danger" onclick="onDelete('${r.id}')">✕</button>
+        </td>`
       : `<td></td>`;
     return `<tr>
       <td style="font-weight:600">${f.Name||'Untitled'}</td>
@@ -625,6 +651,55 @@ async function onStatusChange(id, newStatus) {
     toast('Status updated.');
   } catch(e) {
     toast('Failed to update status.', true);
+  }
+}
+
+// ── EDIT MODAL ────────────────────────────────────────────────────────────────
+let editingId = null;
+
+function openEdit(id) {
+  const rec = allRecords.find(r=>r.id===id);
+  if (!rec) return;
+  const f = rec.fields;
+  editingId = id;
+  document.getElementById('edit-name').value    = f.Name || '';
+  document.getElementById('edit-priority').innerHTML = PRIORITIES.map(p=>`<option${p===f.Priority?' selected':''}>${p}</option>`).join('');
+  document.getElementById('edit-status').innerHTML   = STATUSES.map(s=>`<option${s===f.Status?' selected':''}>${s}</option>`).join('');
+  document.getElementById('edit-due').value      = f['Due Date'] || '';
+  document.getElementById('edit-notes').value    = f.Notes || '';
+  document.getElementById('edit-links').value    = f.Links || '';
+  const modal = document.getElementById('edit-modal');
+  modal.style.display = 'flex';
+}
+
+function closeEdit() {
+  document.getElementById('edit-modal').style.display = 'none';
+  editingId = null;
+}
+
+async function saveEdit() {
+  if (!editingId) return;
+  const btn = document.getElementById('edit-save-btn');
+  btn.disabled = true; btn.textContent = 'Saving...';
+  const fields = {
+    Name:       document.getElementById('edit-name').value.trim(),
+    Priority:   document.getElementById('edit-priority').value,
+    Status:     document.getElementById('edit-status').value,
+    'Due Date': document.getElementById('edit-due').value || null,
+    Notes:      document.getElementById('edit-notes').value.trim(),
+    Links:      document.getElementById('edit-links').value.trim(),
+  };
+  try {
+    await updateRecord(editingId, fields);
+    const rec = allRecords.find(r=>r.id===editingId);
+    if (rec) rec.fields = { ...rec.fields, ...fields };
+    closeEdit();
+    render();
+    toast('Project updated!');
+  } catch(e) {
+    toast('Failed to save.', true);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Save Changes';
   }
 }
 
