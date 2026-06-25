@@ -881,7 +881,9 @@ async function onAdd(owner) {
 }
 
 async function onDelete(id) {
-  if (!confirm('Delete this project and all its subtasks?')) return;
+  const subs = allSubtasks.filter(s=>s.fields.Project===id);
+  const subMsg = subs.length > 0 ? ` and its ${subs.length} subtask${subs.length!==1?'s':''}` : '';
+  if (!confirm(`Delete this project${subMsg}? This cannot be undone.`)) return;
   try {
     // Delete associated subtasks first
     const subs = allSubtasks.filter(s=>s.fields.Project===id);
