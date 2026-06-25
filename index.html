@@ -189,6 +189,31 @@
   <div class="report-grid" id="report-grid"><div class="loading"><div class="spinner"></div> Loading...</div></div>
 </div>
 
+<!-- SUBTASK EDIT MODAL -->
+<div id="subtask-edit-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:1000;align-items:center;justify-content:center">
+  <div style="background:#fff;border-radius:14px;padding:24px;width:90%;max-width:480px;box-shadow:0 8px 32px rgba(0,0,0,.2)">
+    <div style="font-size:15px;font-weight:800;margin-bottom:16px;color:#1a1a2e">Edit Subtask</div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div class="form-group"><label>Subtask Name</label><input id="sedit-name" /></div>
+      <div style="display:flex;gap:10px">
+        <div class="form-group" style="flex:1"><label>DRI</label><input id="sedit-dri" placeholder="Name or team" /></div>
+        <div class="form-group" style="flex:1"><label>Due Date</label><input type="date" id="sedit-due" /></div>
+      </div>
+      <div class="form-group"><label>Notes</label><input id="sedit-notes" /></div>
+      <div class="form-group">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+          <input type="checkbox" id="sedit-done" style="width:14px;height:14px;accent-color:#e94560" />
+          Mark as Done
+        </label>
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px">
+      <button class="btn" style="background:#f0f2f5;color:#333" onclick="closeSubtaskEdit()">Cancel</button>
+      <button class="btn btn-primary" id="sedit-save-btn" onclick="saveSubtaskEdit()">Save Changes</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <!-- EDIT MODAL -->
@@ -431,7 +456,7 @@ function renderTable(containerId, records, showOwner, editable) {
           <td style="padding:6px 14px;font-size:12px;color:#888">${sf.Notes||'—'}</td>
           <td style="padding:6px 14px"></td>
           <td style="padding:6px 14px;white-space:nowrap">
-            ${editable?`<button class="btn btn-danger" onclick="onDeleteSubtask('${s.id}')">✕</button>`:''}
+            ${editable?`<button class="btn btn-danger" style="margin-right:4px" onclick="openSubtaskEdit('${s.id}')">✏️</button><button class="btn btn-danger" onclick="onDeleteSubtask('${s.id}')">✕</button>`:''}
           </td>
         </tr>`;
       }).join('');
@@ -930,6 +955,52 @@ async function onDeleteSubtask(id) {
     render();
     toast('Subtask deleted.');
   } catch(e) { toast('Failed to delete subtask.', true); }
+}
+
+// ── SUBTASK EDIT MODAL ────────────────────────────────────────────────────────
+let editingSubtaskId = null;
+
+function openSubtaskEdit(id) {
+  const s = allSubtasks.find(s=>s.id===id);
+  if (!s) return;
+  editingSubtaskId = id;
+  const f = s.fields;
+  document.getElementById('sedit-name').value  = f.Name || '';
+  document.getElementById('sedit-dri').value   = f.DRI || '';
+  document.getElementById('sedit-due').value   = f['Due Date'] || '';
+  document.getElementById('sedit-notes').value = f.Notes || '';
+  document.getElementById('sedit-done').checked = !!f.Done;
+  document.getElementById('subtask-edit-modal').style.display = 'flex';
+}
+
+function closeSubtaskEdit() {
+  document.getElementById('subtask-edit-modal').style.display = 'none';
+  editingSubtaskId = null;
+}
+
+async function saveSubtaskEdit() {
+  if (!editingSubtaskId) return;
+  const btn = document.getElementById('sedit-save-btn');
+  btn.disabled = true; btn.textContent = 'Saving...';
+  const fields = {
+    Name:       document.getElementById('sedit-name').value.trim(),
+    DRI:        document.getElementById('sedit-dri').value.trim(),
+    'Due Date': document.getElementById('sedit-due').value || null,
+    Notes:      document.getElementById('sedit-notes').value.trim(),
+    Done:       document.getElementById('sedit-done').checked,
+  };
+  try {
+    await updateSubtask(editingSubtaskId, fields);
+    const s = allSubtasks.find(s=>s.id===editingSubtaskId);
+    if (s) s.fields = { ...s.fields, ...fields };
+    closeSubtaskEdit();
+    render();
+    toast('Subtask updated!');
+  } catch(e) {
+    toast('Failed to save.', true);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Save Changes';
+  }
 }
 
 // ── EDIT MODAL ────────────────────────────────────────────────────────────────
