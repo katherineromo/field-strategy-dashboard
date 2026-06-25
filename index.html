@@ -385,12 +385,11 @@ function renderTable(containerId, records, showOwner, editable) {
     const links = (f.Links||'').split('\n').filter(l=>l.trim()).map(l => {
       const parts = l.split('|').map(p=>p.trim());
       const url = parts.length > 1 ? parts[1] : parts[0];
-      const hasName = parts.length > 1 && parts[0];
       const isSheet = url.includes('spreadsheet');
       const isDoc = url.includes('document');
       const icon = isSheet ? '📊' : isDoc ? '📄' : '🔗';
-      const label = hasName ? `${icon} ${parts[0]}` : isSheet ? '📊 Sheet' : isDoc ? '📄 Doc' : '🔗 Link';
-      return `<a href="${url}" target="_blank" style="display:inline-block;padding:2px 8px;background:#f0f2f5;border-radius:6px;font-size:11px;color:#3b82f6;text-decoration:none;margin:1px 2px 1px 0;white-space:nowrap">${label}</a>`;
+      const name = parts.length > 1 && parts[0] ? parts[0] : url.replace(/^https?:\/\//, '').slice(0, 40) + (url.length > 40 ? '…' : '');
+      return `<a href="${url}" target="_blank" style="display:inline-block;padding:2px 8px;background:#f0f2f5;border-radius:6px;font-size:11px;color:#3b82f6;text-decoration:none;margin:1px 2px 1px 0;white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis" title="${url}">${icon} ${name}</a>`;
     }).join('');
     const deleteBtn = editable
       ? `<td style="white-space:nowrap">
