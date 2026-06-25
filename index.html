@@ -117,7 +117,6 @@
       <option value="Johnet">Johnet</option>
       <option value="Kat">Kat</option>
     </select>
-    <button id="backup-btn" onclick="downloadBackup()" style="display:none;padding:5px 12px;background:#059669;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">⬇ Backup</button>
   </div>
   <div class="nav-tabs">
     <button class="nav-tab active" onclick="showPage('overview',this)">Overview</button>
@@ -839,8 +838,6 @@ function renderReporting() {
 }
 
 function render() {
-  const backupBtn = document.getElementById('backup-btn');
-  if (backupBtn) backupBtn.style.display = currentUser === 'Kat' ? 'block' : 'none';
   renderStats();
   renderOverdueSubtasks();
   renderAddForm('aj-form-area', 'AJ');
@@ -1092,57 +1089,6 @@ async function saveEdit() {
   } finally {
     btn.disabled = false; btn.textContent = 'Save Changes';
   }
-}
-
-// ── BACKUP ────────────────────────────────────────────────────────────────────
-function downloadBackup() {
-  const now = new Date().toISOString().slice(0,10);
-
-  // Helper to clean a value for CSV
-  const clean = v => `"${(v||'').toString().replace(/"/g,'""').trim()}"`;
-
-  // Helper to extract link names only (not full URLs)
-  const linkNames = links => (links||'').split('\n').filter(l=>l.trim()).map(l => {
-    const parts = l.split('|').map(p=>p.trim());
-    return parts.length > 1 ? parts[0] : l.replace(/^https?:\/\//, '').split('/')[0];
-  }).join('; ');
-
-  // Projects CSV
-  const projHeaders = ['Name','Owner','Priority','Status','Due Date','Notes','Links'];
-  const projRows = allRecords.map(r => [
-    clean(r.fields.Name),
-    clean(r.fields.Owner),
-    clean(r.fields.Priority),
-    clean(r.fields.Status),
-    clean(r.fields['Due Date']),
-    clean(r.fields.Notes),
-    clean(linkNames(r.fields.Links)),
-  ].join(','));
-
-  // Subtasks CSV
-  const subHeaders = ['Subtask','Project','DRI','Done','Due Date','Notes'];
-  const subRows = allSubtasks.filter(s=>s.fields.Name).map(s => {
-    const projName = allRecords.find(r=>r.id===s.fields.Project)?.fields?.Name || '';
-    return [
-      clean(s.fields.Name),
-      clean(projName),
-      clean(s.fields.DRI),
-      s.fields.Done ? '"Yes"' : '"No"',
-      clean(s.fields['Due Date']),
-      clean(s.fields.Notes),
-    ].join(',');
-  });
-
-  const projCSV = [projHeaders.join(','), ...projRows].join('\n');
-  const subCSV  = [subHeaders.join(','), ...subRows].join('\n');
-  const full = `FIELD STRATEGY BACKUP — ${now}\n\n--- PROJECTS ---\n${projCSV}\n\n--- SUBTASKS ---\n${subCSV}`;
-
-  const blob = new Blob([full], { type: 'text/csv' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `field-strategy-backup-${now}.csv`;
-  a.click();
-  toast('Backup downloaded!');
 }
 
 // ── NAV ───────────────────────────────────────────────────────────────────────
