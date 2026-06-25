@@ -117,6 +117,7 @@
       <option value="Johnet">Johnet</option>
       <option value="Kat">Kat</option>
     </select>
+    <button id="backup-btn" onclick="downloadBackup()" style="display:none;padding:5px 12px;background:#059669;color:#fff;border:none;border-radius:6px;font-size:12px;font-weight:700;cursor:pointer">⬇ Backup</button>
   </div>
   <div class="nav-tabs">
     <button class="nav-tab active" onclick="showPage('overview',this)">Overview</button>
@@ -834,6 +835,8 @@ function renderReporting() {
 }
 
 function render() {
+  const backupBtn = document.getElementById('backup-btn');
+  if (backupBtn) backupBtn.style.display = currentUser === 'Kat' ? 'block' : 'none';
   renderStats();
   renderOverdueSubtasks();
   renderAddForm('aj-form-area', 'AJ');
@@ -851,7 +854,16 @@ function render() {
 
 // ── EVENT HANDLERS ────────────────────────────────────────────────────────────
 function onUserChange() {
-  currentUser = document.getElementById('current-user').value;
+  const selected = document.getElementById('current-user').value;
+  if (selected === 'Kat') {
+    const pin = prompt('Enter your PIN to access Kat\'s view:');
+    if (pin !== '2172') {
+      alert('Incorrect PIN.');
+      document.getElementById('current-user').value = currentUser || '';
+      return;
+    }
+  }
+  currentUser = selected;
   render();
 }
 
@@ -1073,6 +1085,40 @@ async function saveEdit() {
   } finally {
     btn.disabled = false; btn.textContent = 'Save Changes';
   }
+}
+
+// ── BACKUP ────────────────────────────────────────────────────────────────────
+function downloadBackup() {
+  const now = new Date().toISOString().slice(0,10);
+
+  // Projects CSV
+  const projHeaders = ['Name','Owner','Priority','Status','Due Date','Notes','Links'];
+  const projRows = allRecords.map(r => projHeaders.map(h => `"${(r.fields[h]||'').toString().replace(/"/g,'""')}"`).join(','));
+  const projCSV = [projHeaders.join(','), ...projRows].join('\n');
+
+  // Subtasks CSV
+  const subHeaders = ['Name','Project','DRI','Done','Due Date','Notes'];
+  const subRows = allSubtasks.map(s => {
+    const projName = allRecords.find(r=>r.id===s.fields.Project)?.fields?.Name || s.fields.Project || '';
+    return [
+      `"${(s.fields.Name||'').replace(/"/g,'""')}"`,
+      `"${projName.replace(/"/g,'""')}"`,
+      `"${(s.fields.DRI||'').replace(/"/g,'""')}"`,
+      s.fields.Done ? 'Yes' : 'No',
+      `"${(s.fields['Due Date']||'').replace(/"/g,'""')}"`,
+      `"${(s.fields.Notes||'').replace(/"/g,'""')}"`,
+    ].join(',');
+  });
+  const subCSV = [subHeaders.join(','), ...subRows].join('\n');
+
+  // Combine into one file with sections
+  const full = `FIELD STRATEGY BACKUP — ${now}\n\n--- PROJECTS ---\n${projCSV}\n\n--- SUBTASKS ---\n${subCSV}`;
+  const blob = new Blob([full], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `field-strategy-backup-${now}.csv`;
+  a.click();
+  toast('Backup downloaded!');
 }
 
 // ── NAV ───────────────────────────────────────────────────────────────────────
