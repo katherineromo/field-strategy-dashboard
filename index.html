@@ -275,8 +275,10 @@ const PRIORITY_STYLE = {
 // 1. It's overdue (past due date, not complete/ongoing), OR
 // 2. It has one or more overdue subtasks
 function isAutoRisk(record) {
+  if (!record || !record.fields) return false;
   if (record.fields.Status === 'Complete' || record.fields.Status === 'Ongoing') return false;
   if (isOverdue(record.fields['Due Date'], record.fields.Status)) return true;
+  if (!allSubtasks || !allSubtasks.length) return false;
   const subs = allSubtasks.filter(s => s.fields.Project === record.id);
   return subs.some(s => isOverdue(s.fields['Due Date'], s.fields.Done ? 'Complete' : 'In Progress'));
 }
@@ -383,7 +385,10 @@ async function deleteSubtask(id) {
 // ── LOAD & REFRESH ────────────────────────────────────────────────────────────
 async function loadData() {
   try {
-    [allRecords, allSubtasks] = await Promise.all([fetchAll(), fetchSubtasks()]);
+    const [projects, subtasks] = await Promise.allSettled([fetchAll(), fetchSubtasks()]);
+    allRecords   = projects.status === 'fulfilled' ? projects.value : [];
+    allSubtasks  = subtasks.status === 'fulfilled' ? subtasks.value : [];
+    if (projects.status === 'rejected') toast('Could not load projects. Check Airtable config.', true);
     render();
   } catch(e) {
     console.error(e);
