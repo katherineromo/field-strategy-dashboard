@@ -396,7 +396,7 @@ function renderTable(containerId, records, showOwner, editable) {
         </td>`
       : `<td></td>`;
 
-    const mySubs = allSubtasks.filter(s => (s.fields.Project||[]).includes(r.id));
+    const mySubs = allSubtasks.filter(s => s.fields.Project === r.id);
     const doneCount = mySubs.filter(s=>s.fields.Done).length;
     const expanded = expandedRows.has(r.id);
     const expandBtn = `<button onclick="toggleExpand('${r.id}')" style="background:none;border:none;cursor:pointer;font-size:11px;color:#888;padding:0;display:flex;align-items:center;gap:4px;margin-top:4px">
@@ -681,7 +681,7 @@ function renderReporting() {
 
   const subtaskByOwner = Object.keys(OWNER_META).map(o => {
     const ownerProjects = allRecords.filter(r=>r.fields.Owner===o).map(r=>r.id);
-    const mine = allSubtasks.filter(s=>(s.fields.Project||[]).some(pid=>ownerProjects.includes(pid)));
+    const mine = allSubtasks.filter(s=>ownerProjects.includes(s.fields.Project));
     const done = mine.filter(s=>s.fields.Done).length;
     const pct  = mine.length ? Math.round(done/mine.length*100) : 0;
     return `<div class="bar-row">
@@ -750,9 +750,9 @@ async function onDelete(id) {
   if (!confirm('Delete this project and all its subtasks?')) return;
   try {
     // Delete associated subtasks first
-    const subs = allSubtasks.filter(s=>(s.fields.Project||[]).includes(id));
+    const subs = allSubtasks.filter(s=>s.fields.Project===id);
     await Promise.all(subs.map(s=>deleteSubtask(s.id)));
-    allSubtasks = allSubtasks.filter(s=>!(s.fields.Project||[]).includes(id));
+    allSubtasks = allSubtasks.filter(s=>s.fields.Project!==id);
     await deleteRecord(id);
     allRecords = allRecords.filter(r=>r.id!==id);
     expandedRows.delete(id);
@@ -787,7 +787,7 @@ async function onAddSubtask(projectId) {
   if (!name) return;
   const fields = {
     Name:       name,
-    Project:    [projectId],
+    Project:    projectId,
     DRI:        document.getElementById(`newsub-dri-${projectId}`)?.value?.trim() || '',
     Done:       false,
     'Due Date': document.getElementById(`newsub-due-${projectId}`)?.value || null,
