@@ -202,7 +202,7 @@
         <div class="form-group" style="flex:1"><label>Due Date</label><input type="date" id="edit-due" /></div>
       </div>
       <div class="form-group"><label>Notes</label><input id="edit-notes" /></div>
-      <div class="form-group"><label>Links (one per line)</label><textarea id="edit-links" rows="3" style="resize:vertical"></textarea></div>
+      <div class="form-group"><label>Links (one per line — Name | URL or just URL)</label><textarea id="edit-links" rows="3" placeholder="SOP Draft | https://docs.google.com/..." style="resize:vertical"></textarea></div>
     </div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px">
       <button class="btn" style="background:#f0f2f5;color:#333" onclick="closeEdit()">Cancel</button>
@@ -383,10 +383,13 @@ function renderTable(containerId, records, showOwner, editable) {
       : badge(f.Status||'Not Started', ss);
     const ownerCell = showOwner ? `<td>${pill(f.Owner||'—', OWNER_META[f.Owner]?.color||'#888')}</td>` : '';
     const links = (f.Links||'').split('\n').filter(l=>l.trim()).map(l => {
-      const url = l.trim();
+      const parts = l.split('|').map(p=>p.trim());
+      const url = parts.length > 1 ? parts[1] : parts[0];
+      const hasName = parts.length > 1 && parts[0];
       const isSheet = url.includes('spreadsheet');
       const isDoc = url.includes('document');
-      const label = isSheet ? '📊 Sheet' : isDoc ? '📄 Doc' : '🔗 Link';
+      const icon = isSheet ? '📊' : isDoc ? '📄' : '🔗';
+      const label = hasName ? `${icon} ${parts[0]}` : isSheet ? '📊 Sheet' : isDoc ? '📄 Doc' : '🔗 Link';
       return `<a href="${url}" target="_blank" style="display:inline-block;padding:2px 8px;background:#f0f2f5;border-radius:6px;font-size:11px;color:#3b82f6;text-decoration:none;margin:1px 2px 1px 0;white-space:nowrap">${label}</a>`;
     }).join('');
     const deleteBtn = editable
@@ -508,8 +511,8 @@ function renderAddForm(areaId, owner) {
         <input id="new-notes-${owner}" placeholder="Brief description..." />
       </div>
       <div class="form-group" style="flex:2;min-width:140px">
-        <label>Links (Google Doc/Sheet URLs, one per line)</label>
-        <textarea id="new-links-${owner}" rows="2" placeholder="https://docs.google.com/..." style="resize:vertical"></textarea>
+        <label>Links (one per line — Name | URL or just URL)</label>
+        <textarea id="new-links-${owner}" rows="2" placeholder="SOP Draft | https://docs.google.com/..." style="resize:vertical"></textarea>
       </div>
       <div class="form-group" style="justify-content:flex-end">
         <button class="btn btn-primary" id="add-btn-${owner}" onclick="onAdd('${owner}')">Add</button>
