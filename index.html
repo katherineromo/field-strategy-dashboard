@@ -270,7 +270,16 @@ const PRIORITY_STYLE = {
   Low:    { bg:'#d1fae5', color:'#065f46' },
 };
 
-const SUBTASKS_API = `https://api.airtable.com/v0/${AIRTABLE_BASE}/Subtasks`;
+// ── AUTO-RISK HELPER ──────────────────────────────────────────────────────────
+// A project is "auto at risk" if:
+// 1. It's overdue (past due date, not complete/ongoing), OR
+// 2. It has one or more overdue subtasks
+function isAutoRisk(record) {
+  if (record.fields.Status === 'Complete' || record.fields.Status === 'Ongoing') return false;
+  if (isOverdue(record.fields['Due Date'], record.fields.Status)) return true;
+  const subs = allSubtasks.filter(s => s.fields.Project === record.id);
+  return subs.some(s => isOverdue(s.fields['Due Date'], s.fields.Done ? 'Complete' : 'In Progress'));
+}
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
 let allRecords = [];
@@ -485,9 +494,10 @@ function renderTable(containerId, records, showOwner, editable) {
       subtaskRows = subRows + addSubRow;
     }
 
-    return `<tr>
+    const autoRisk = isAutoRisk(r);
+    return `<tr style="${autoRisk && r.fields.Status !== 'At Risk' ? 'background:#fff8f8;' : ''}">
       <td style="font-weight:600">
-        ${f.Name||'Untitled'}
+        ${f.Name||'Untitled'}${autoRisk && f.Status !== 'At Risk' ? ' <span style="font-size:10px;font-weight:700;color:#e94560;background:#fee2e2;padding:1px 6px;border-radius:10px;vertical-align:middle">AUTO RISK</span>' : ''}
         ${expandBtn}
       </td>
       ${ownerCell}
@@ -560,7 +570,7 @@ function ringPath(pct, r) {
 function renderStats() {
   const total    = allRecords.length;
   const complete = allRecords.filter(r=>r.fields.Status==='Complete').length;
-  const atRisk   = allRecords.filter(r=>r.fields.Status==='At Risk').length;
+  const atRisk   = allRecords.filter(r=>r.fields.Status==='At Risk' || isAutoRisk(r)).length;
   const overdue  = allRecords.filter(r=>isOverdue(r.fields['Due Date'], r.fields.Status)).length;
   const inProg   = allRecords.filter(r=>r.fields.Status==='In Progress').length;
   const notStart = allRecords.filter(r=>r.fields.Status==='Not Started').length;
@@ -723,13 +733,19 @@ function renderReporting() {
     barHtml(p, allRecords.filter(r=>r.fields.Priority===p).length, total, PRIORITY_STYLE[p].color)
   ).join('');
 
-  const attn = allRecords.filter(r => r.fields.Status==='At Risk' || isOverdue(r.fields['Due Date'], r.fields.Status));
+  const attn = allRecords.filter(r => r.fields.Status==='At Risk' || isAutoRisk(r));
   const attnHtml = attn.length === 0
     ? `<div style="color:#10b981;font-weight:600;font-size:13px">✓ All clear — nothing flagged.</div>`
-    : attn.map(r => `<div class="attention-item">
-        <div style="flex:1"><div class="name">${r.fields.Name||'Untitled'}</div><div class="meta">${r.fields.Owner} · Due ${fmtDate(r.fields['Due Date'])}</div></div>
-        ${badge(r.fields.Status, STATUS_STYLE[r.fields.Status]||STATUS_STYLE['Not Started'])}
-      </div>`).join('');
+    : attn.map(r => {
+        const reason = r.fields.Status === 'At Risk' ? 'Manually flagged' : isOverdue(r.fields['Due Date'], r.fields.Status) ? 'Project overdue' : 'Has overdue subtasks';
+        return `<div class="attention-item">
+          <div style="flex:1">
+            <div class="name">${r.fields.Name||'Untitled'}</div>
+            <div class="meta">${r.fields.Owner} · ${reason} · Due ${fmtDate(r.fields['Due Date'])}</div>
+          </div>
+          ${badge(r.fields.Status, STATUS_STYLE[r.fields.Status]||STATUS_STYLE['Not Started'])}
+        </div>`;
+      }).join('');
 
   // ── SUBTASK REPORTING ──────────────────────────────────────────────────────
   const totalSubs = allSubtasks.length;
