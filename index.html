@@ -855,16 +855,7 @@ function render() {
 
 // ── EVENT HANDLERS ────────────────────────────────────────────────────────────
 function onUserChange() {
-  const selected = document.getElementById('current-user').value;
-  if (selected === 'Kat') {
-    const pin = prompt('Enter your PIN to access Kat\'s view:');
-    if (pin !== '2172') {
-      alert('Incorrect PIN.');
-      document.getElementById('current-user').value = currentUser || '';
-      return;
-    }
-  }
-  currentUser = selected;
+  currentUser = document.getElementById('current-user').value;
   render();
 }
 
