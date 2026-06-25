@@ -242,9 +242,13 @@ const PRIORITY_STYLE = {
   Low:    { bg:'#d1fae5', color:'#065f46' },
 };
 
+const SUBTASKS_API = `https://api.airtable.com/v0/${AIRTABLE_BASE}/Subtasks`;
+
 // ── STATE ─────────────────────────────────────────────────────────────────────
-let allRecords = []; // [{ id, fields: { Name, Owner, Priority, Status, Due Date, Notes } }]
+let allRecords = [];
+let allSubtasks = [];
 let currentUser = '';
+let expandedRows = new Set();
 
 // ── TOAST ─────────────────────────────────────────────────────────────────────
 let toastTimer;
@@ -303,16 +307,51 @@ async function deleteRecord(id) {
   if (!res.ok) throw new Error('Failed to delete');
 }
 
+async function fetchSubtasks() {
+  let records = [], offset;
+  do {
+    const url = SUBTASKS_API + (offset ? `?offset=${offset}` : '');
+    const res = await fetch(url, { headers: HEADERS });
+    if (!res.ok) throw new Error(`Airtable subtasks error: ${res.status}`);
+    const data = await res.json();
+    records = records.concat(data.records);
+    offset = data.offset;
+  } while (offset);
+  return records;
+}
+
+async function createSubtask(fields) {
+  const res = await fetch(SUBTASKS_API, {
+    method: 'POST', headers: HEADERS,
+    body: JSON.stringify({ records: [{ fields }] })
+  });
+  if (!res.ok) throw new Error('Failed to create subtask');
+  return (await res.json()).records[0];
+}
+
+async function updateSubtask(id, fields) {
+  const res = await fetch(`${SUBTASKS_API}/${id}`, {
+    method: 'PATCH', headers: HEADERS,
+    body: JSON.stringify({ fields })
+  });
+  if (!res.ok) throw new Error('Failed to update subtask');
+  return (await res.json());
+}
+
+async function deleteSubtask(id) {
+  const res = await fetch(`${SUBTASKS_API}/${id}`, { method: 'DELETE', headers: HEADERS });
+  if (!res.ok) throw new Error('Failed to delete subtask');
+}
+
 // ── LOAD & REFRESH ────────────────────────────────────────────────────────────
 async function loadData() {
   try {
-    allRecords = await fetchAll();
+    [allRecords, allSubtasks] = await Promise.all([fetchAll(), fetchSubtasks()]);
     render();
   } catch(e) {
     console.error(e);
     toast('Could not load data. Check Airtable config.', true);
-    // Show empty state anyway
-    allRecords = [];
+    allRecords = []; allSubtasks = [];
     render();
   }
 }
@@ -356,8 +395,68 @@ function renderTable(containerId, records, showOwner, editable) {
           <button class="btn btn-danger" onclick="onDelete('${r.id}')">✕</button>
         </td>`
       : `<td></td>`;
+
+    const mySubs = allSubtasks.filter(s => (s.fields.Project||[]).includes(r.id));
+    const doneCount = mySubs.filter(s=>s.fields.Done).length;
+    const expanded = expandedRows.has(r.id);
+    const expandBtn = `<button onclick="toggleExpand('${r.id}')" style="background:none;border:none;cursor:pointer;font-size:11px;color:#888;padding:0;display:flex;align-items:center;gap:4px;margin-top:4px">
+      ${expanded ? '▾' : '▸'} ${mySubs.length} subtask${mySubs.length!==1?'s':''} ${mySubs.length>0?`(${doneCount}/${mySubs.length} done)`:''}
+    </button>`;
+
+    // Subtask expanded rows
+    let subtaskRows = '';
+    if (expanded) {
+      const subRowStyle = 'background:#f8f9fb;border-top:none;';
+      const subRows = mySubs.map(s => {
+        const sf = s.fields;
+        const checked = sf.Done ? 'checked' : '';
+        return `<tr style="${subRowStyle}">
+          <td colspan="${showOwner?2:1}" style="padding:6px 14px 6px 32px">
+            <div style="display:flex;align-items:center;gap:8px">
+              <input type="checkbox" ${checked} onchange="onSubtaskToggle('${s.id}', this.checked)" style="width:14px;height:14px;cursor:pointer;accent-color:#e94560" />
+              <span style="font-size:13px;${sf.Done?'text-decoration:line-through;color:#aaa':''}">${sf.Name||'Untitled'}</span>
+            </div>
+          </td>
+          <td style="padding:6px 14px;font-size:12px;color:#555">${sf.DRI||'—'}</td>
+          <td style="padding:6px 14px"></td>
+          <td style="padding:6px 14px;font-size:12px;color:${isOverdue(sf['Due Date'],sf.Done?'Complete':'In Progress')?'#e94560':'#555'}">${fmtDate(sf['Due Date'])}</td>
+          <td style="padding:6px 14px;font-size:12px;color:#888">${sf.Notes||'—'}</td>
+          <td style="padding:6px 14px"></td>
+          <td style="padding:6px 14px;white-space:nowrap">
+            ${editable?`<button class="btn btn-danger" onclick="onDeleteSubtask('${s.id}')">✕</button>`:''}
+          </td>
+        </tr>`;
+      }).join('');
+
+      // Add subtask form row
+      const addSubRow = editable ? `<tr style="${subRowStyle}">
+        <td colspan="${showOwner?2:1}" style="padding:6px 14px 8px 32px">
+          <input id="newsub-name-${r.id}" placeholder="+ Add subtask..." style="border:1px dashed #d0d0d0;border-radius:6px;padding:5px 8px;font-size:12px;outline:none;background:#fff;width:100%" onkeydown="if(event.key==='Enter')onAddSubtask('${r.id}')" />
+        </td>
+        <td style="padding:6px 14px">
+          <input id="newsub-dri-${r.id}" placeholder="DRI" style="border:1px dashed #d0d0d0;border-radius:6px;padding:5px 8px;font-size:12px;outline:none;background:#fff;width:100%" />
+        </td>
+        <td></td>
+        <td style="padding:6px 14px">
+          <input type="date" id="newsub-due-${r.id}" style="border:1px dashed #d0d0d0;border-radius:6px;padding:5px 8px;font-size:12px;outline:none;background:#fff;width:100%" />
+        </td>
+        <td style="padding:6px 14px">
+          <input id="newsub-notes-${r.id}" placeholder="Notes" style="border:1px dashed #d0d0d0;border-radius:6px;padding:5px 8px;font-size:12px;outline:none;background:#fff;width:100%" />
+        </td>
+        <td></td>
+        <td style="padding:6px 14px">
+          <button class="btn btn-primary" style="font-size:11px;padding:5px 10px" onclick="onAddSubtask('${r.id}')">Add</button>
+        </td>
+      </tr>` : '';
+
+      subtaskRows = subRows + addSubRow;
+    }
+
     return `<tr>
-      <td style="font-weight:600">${f.Name||'Untitled'}</td>
+      <td style="font-weight:600">
+        ${f.Name||'Untitled'}
+        ${expandBtn}
+      </td>
       ${ownerCell}
       <td>${badge(f.Priority||'Medium', ps)}</td>
       <td>${statusEl}</td>
@@ -365,7 +464,7 @@ function renderTable(containerId, records, showOwner, editable) {
       <td style="color:#666;font-size:12px">${f.Notes||'—'}</td>
       <td style="min-width:120px">${links||'—'}</td>
       ${deleteBtn}
-    </tr>`;
+    </tr>${subtaskRows}`;
   }).join('');
   wrap.innerHTML = `<table>
     <thead><tr><th>Project</th>${ownerCol}<th>Priority</th><th>Status</th><th>Due</th><th>Notes</th><th>Links</th><th></th></tr></thead>
@@ -576,11 +675,28 @@ function renderReporting() {
         ${badge(r.fields.Status, STATUS_STYLE[r.fields.Status]||STATUS_STYLE['Not Started'])}
       </div>`).join('');
 
+  const totalSubs = allSubtasks.length;
+  const doneSubs  = allSubtasks.filter(s=>s.fields.Done).length;
+  const subRate   = totalSubs ? Math.round(doneSubs/totalSubs*100) : 0;
+
+  const subtaskByOwner = Object.keys(OWNER_META).map(o => {
+    const ownerProjects = allRecords.filter(r=>r.fields.Owner===o).map(r=>r.id);
+    const mine = allSubtasks.filter(s=>(s.fields.Project||[]).some(pid=>ownerProjects.includes(pid)));
+    const done = mine.filter(s=>s.fields.Done).length;
+    const pct  = mine.length ? Math.round(done/mine.length*100) : 0;
+    return `<div class="bar-row">
+      <span class="bar-label">${o}</span>
+      <div class="bar-track"><div class="bar-fill" style="width:${pct}%;background:${OWNER_META[o].color}"></div></div>
+      <span class="bar-count">${done}/${mine.length}</span>
+    </div>`;
+  }).join('');
+
   document.getElementById('report-grid').innerHTML = `
     <div class="report-box"><h3>Status — All Projects</h3>${statusBars}</div>
     <div class="report-box"><h3>Projects by Owner</h3>${ownerBars}<div style="border-top:1px solid #f0f0f0;padding-top:14px;margin-top:14px"><div style="font-weight:700;font-size:13px;margin-bottom:10px">Completion Rate by Owner</div>${completionBars}</div></div>
     <div class="report-box"><h3>Priority Distribution</h3>${priorityBars}</div>
-    <div class="report-box"><h3>⚠ Needs Attention</h3>${attnHtml}</div>
+    <div class="report-box"><h3>Subtasks — ${doneSubs}/${totalSubs} done (${subRate}%)</h3>${subtaskByOwner}</div>
+    <div class="report-box" style="grid-column:1/-1"><h3>⚠ Needs Attention</h3><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">${attnHtml}</div></div>
   `;
 }
 
@@ -631,10 +747,15 @@ async function onAdd(owner) {
 }
 
 async function onDelete(id) {
-  if (!confirm('Delete this project?')) return;
+  if (!confirm('Delete this project and all its subtasks?')) return;
   try {
+    // Delete associated subtasks first
+    const subs = allSubtasks.filter(s=>(s.fields.Project||[]).includes(id));
+    await Promise.all(subs.map(s=>deleteSubtask(s.id)));
+    allSubtasks = allSubtasks.filter(s=>!(s.fields.Project||[]).includes(id));
     await deleteRecord(id);
     allRecords = allRecords.filter(r=>r.id!==id);
+    expandedRows.delete(id);
     render();
     toast('Project deleted.');
   } catch(e) {
@@ -652,6 +773,53 @@ async function onStatusChange(id, newStatus) {
   } catch(e) {
     toast('Failed to update status.', true);
   }
+}
+
+// ── SUBTASK HANDLERS ─────────────────────────────────────────────────────────
+function toggleExpand(projectId) {
+  if (expandedRows.has(projectId)) expandedRows.delete(projectId);
+  else expandedRows.add(projectId);
+  render();
+}
+
+async function onAddSubtask(projectId) {
+  const name = document.getElementById(`newsub-name-${projectId}`)?.value?.trim();
+  if (!name) return;
+  const fields = {
+    Name:       name,
+    Project:    [projectId],
+    DRI:        document.getElementById(`newsub-dri-${projectId}`)?.value?.trim() || '',
+    Done:       false,
+    'Due Date': document.getElementById(`newsub-due-${projectId}`)?.value || null,
+    Notes:      document.getElementById(`newsub-notes-${projectId}`)?.value?.trim() || '',
+  };
+  try {
+    const rec = await createSubtask(fields);
+    allSubtasks.push(rec);
+    expandedRows.add(projectId);
+    render();
+    toast('Subtask added!');
+  } catch(e) { toast('Failed to add subtask.', true); }
+}
+
+async function onSubtaskToggle(id, done) {
+  try {
+    await updateSubtask(id, { Done: done });
+    const s = allSubtasks.find(s=>s.id===id);
+    if (s) s.fields.Done = done;
+    render();
+    toast(done ? '✓ Subtask done!' : 'Subtask reopened.');
+  } catch(e) { toast('Failed to update.', true); }
+}
+
+async function onDeleteSubtask(id) {
+  if (!confirm('Delete this subtask?')) return;
+  try {
+    await deleteSubtask(id);
+    allSubtasks = allSubtasks.filter(s=>s.id!==id);
+    render();
+    toast('Subtask deleted.');
+  } catch(e) { toast('Failed to delete subtask.', true); }
 }
 
 // ── EDIT MODAL ────────────────────────────────────────────────────────────────
