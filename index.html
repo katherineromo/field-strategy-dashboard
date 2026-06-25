@@ -147,6 +147,9 @@
   <!-- OWNER PROGRESS CARDS -->
   <div id="owner-progress" style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-bottom:24px"></div>
 
+  <!-- OVERDUE SUBTASKS -->
+  <div id="overdue-subtasks-section" style="margin-bottom:24px"></div>
+
   <div class="section-title">All Projects</div>
   <div class="tbl-wrap" id="all-table-wrap"><div class="loading"><div class="spinner"></div> Loading...</div></div>
 </div>
@@ -636,6 +639,29 @@ function renderStats() {
   }).join('');
 }
 
+function renderOverdueSubtasks() {
+  const section = document.getElementById('overdue-subtasks-section');
+  if (!section) return;
+  const overdue = allSubtasks.filter(s => isOverdue(s.fields['Due Date'], s.fields.Done ? 'Complete' : 'In Progress'));
+  if (!overdue.length) { section.innerHTML = ''; return; }
+
+  const projectName = id => allRecords.find(r=>r.id===id)?.fields?.Name || 'Unknown Project';
+  section.innerHTML = `
+    <div style="background:#fff;border-radius:14px;padding:20px;box-shadow:0 1px 4px rgba(0,0,0,.07);border-left:4px solid #e94560">
+      <div style="font-weight:800;font-size:14px;margin-bottom:12px;color:#991b1b">⚠ Overdue Subtasks (${overdue.length})</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:8px">
+        ${overdue.map(s => `
+          <div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:#fff5f5;border-radius:8px">
+            <div style="flex:1">
+              <div style="font-size:13px;font-weight:600;color:#1a1a2e">${s.fields.Name||'Untitled'}</div>
+              <div style="font-size:11px;color:#888;margin-top:2px">${projectName(s.fields.Project)} · DRI: ${s.fields.DRI||'—'} · Due ${fmtDate(s.fields['Due Date'])}</div>
+            </div>
+            <span style="font-size:11px;font-weight:700;color:#e94560;white-space:nowrap">Overdue</span>
+          </div>`).join('')}
+      </div>
+    </div>`;
+}
+
 function barHtml(label, count, total, color) {
   const pct = total ? Math.round(count/total*100) : 0;
   return `<div class="bar-row">
@@ -680,10 +706,13 @@ function renderReporting() {
         ${badge(r.fields.Status, STATUS_STYLE[r.fields.Status]||STATUS_STYLE['Not Started'])}
       </div>`).join('');
 
+  // ── SUBTASK REPORTING ──────────────────────────────────────────────────────
   const totalSubs = allSubtasks.length;
   const doneSubs  = allSubtasks.filter(s=>s.fields.Done).length;
   const subRate   = totalSubs ? Math.round(doneSubs/totalSubs*100) : 0;
+  const overdueSubs = allSubtasks.filter(s => isOverdue(s.fields['Due Date'], s.fields.Done ? 'Complete' : 'In Progress'));
 
+  // Subtasks by owner
   const subtaskByOwner = Object.keys(OWNER_META).map(o => {
     const ownerProjects = allRecords.filter(r=>r.fields.Owner===o).map(r=>r.id);
     const mine = allSubtasks.filter(s=>ownerProjects.includes(s.fields.Project));
@@ -696,17 +725,71 @@ function renderReporting() {
     </div>`;
   }).join('');
 
+  // Subtasks by DRI
+  const driMap = {};
+  allSubtasks.forEach(s => {
+    const dri = s.fields.DRI || 'Unassigned';
+    if (!driMap[dri]) driMap[dri] = { total: 0, done: 0 };
+    driMap[dri].total++;
+    if (s.fields.Done) driMap[dri].done++;
+  });
+  const driMax = Math.max(...Object.values(driMap).map(d=>d.total), 1);
+  const driBars = Object.entries(driMap).sort((a,b)=>b[1].total-a[1].total).map(([dri, d]) =>
+    `<div class="bar-row">
+      <span class="bar-label" style="width:130px">${dri.length>16?dri.slice(0,16)+'…':dri}</span>
+      <div class="bar-track"><div class="bar-fill" style="width:${Math.round(d.total/driMax*100)}%;background:#8b5cf6"></div></div>
+      <span class="bar-count" style="width:40px">${d.done}/${d.total}</span>
+    </div>`
+  ).join('') || '<div style="color:#aaa;font-size:13px">No subtasks yet</div>';
+
+  // Subtasks per project
+  const projectSubRows = allRecords.map(r => {
+    const subs = allSubtasks.filter(s=>s.fields.Project===r.id);
+    if (!subs.length) return '';
+    const done = subs.filter(s=>s.fields.Done).length;
+    const pct = Math.round(done/subs.length*100);
+    const od = subs.filter(s=>isOverdue(s.fields['Due Date'], s.fields.Done?'Complete':'In Progress')).length;
+    return `<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;padding:8px 10px;background:#f8f9fb;border-radius:8px">
+      <div style="flex:1;min-width:0">
+        <div style="font-size:12px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${r.fields.Name}</div>
+        <div style="font-size:11px;color:#888;margin-top:2px">${done}/${subs.length} done${od>0?` · <span style="color:#e94560">${od} overdue</span>`:''}</div>
+      </div>
+      <div style="width:80px;background:#e0e0e0;border-radius:6px;height:6px;flex-shrink:0">
+        <div style="width:${pct}%;height:100%;background:#10b981;border-radius:6px"></div>
+      </div>
+      <span style="font-size:12px;font-weight:700;color:#10b981;flex-shrink:0">${pct}%</span>
+    </div>`;
+  }).filter(Boolean).join('') || '<div style="color:#aaa;font-size:13px">No subtasks yet</div>';
+
+  // Overdue subtasks list
+  const overdueSubHtml = overdueSubs.length === 0
+    ? `<div style="color:#10b981;font-weight:600;font-size:13px">✓ No overdue subtasks.</div>`
+    : overdueSubs.map(s => {
+        const proj = allRecords.find(r=>r.id===s.fields.Project)?.fields?.Name || '—';
+        return `<div class="attention-item">
+          <div style="flex:1">
+            <div class="name">${s.fields.Name||'Untitled'}</div>
+            <div class="meta">${proj} · DRI: ${s.fields.DRI||'—'} · Due ${fmtDate(s.fields['Due Date'])}</div>
+          </div>
+          <span style="font-size:11px;font-weight:700;color:#e94560;flex-shrink:0">Overdue</span>
+        </div>`;
+      }).join('');
+
   document.getElementById('report-grid').innerHTML = `
     <div class="report-box"><h3>Status — All Projects</h3>${statusBars}</div>
     <div class="report-box"><h3>Projects by Owner</h3>${ownerBars}<div style="border-top:1px solid #f0f0f0;padding-top:14px;margin-top:14px"><div style="font-weight:700;font-size:13px;margin-bottom:10px">Completion Rate by Owner</div>${completionBars}</div></div>
     <div class="report-box"><h3>Priority Distribution</h3>${priorityBars}</div>
+    <div class="report-box"><h3>⚠ Projects Needing Attention</h3>${attnHtml}</div>
     <div class="report-box"><h3>Subtasks — ${doneSubs}/${totalSubs} done (${subRate}%)</h3>${subtaskByOwner}</div>
-    <div class="report-box" style="grid-column:1/-1"><h3>⚠ Needs Attention</h3><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">${attnHtml}</div></div>
+    <div class="report-box"><h3>Subtasks by DRI</h3>${driBars}</div>
+    <div class="report-box" style="grid-column:1/-1"><h3>Subtasks per Project</h3>${projectSubRows}</div>
+    <div class="report-box" style="grid-column:1/-1"><h3>⚠ Overdue Subtasks (${overdueSubs.length})</h3>${overdueSubHtml}</div>
   `;
 }
 
 function render() {
   renderStats();
+  renderOverdueSubtasks();
   renderAddForm('aj-form-area', 'AJ');
   renderAddForm('johnet-form-area', 'Johnet');
   renderAddForm('kat-form-area', 'Kat');
