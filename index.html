@@ -365,7 +365,10 @@ async function createSubtask(fields) {
     method: 'POST', headers: HEADERS,
     body: JSON.stringify({ records: [{ fields }] })
   });
-  if (!res.ok) throw new Error('Failed to create subtask');
+  if (!res.ok) {
+    const err = await res.json();
+    throw new Error(err?.error?.message || `Status ${res.status}`);
+  }
   return (await res.json()).records[0];
 }
 
@@ -969,7 +972,10 @@ async function onAddSubtask(projectId) {
     expandedRows.add(projectId);
     render();
     toast('Subtask added!');
-  } catch(e) { toast('Failed to add subtask.', true); }
+  } catch(e) { 
+    console.error('Subtask error:', e);
+    toast('Failed to add subtask: ' + e.message, true); 
+  }
 }
 
 async function onSubtaskToggle(id, done) {
